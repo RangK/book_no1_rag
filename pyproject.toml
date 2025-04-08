@@ -14,7 +14,9 @@ dependencies = [
     "pandas>=2.2.3",
     "pip>=25.0.1",
     "scikit-learn>=1.6.1",
+    "sentence-transformers>=2,<3",
     "setuptools>=78.1.0",
     "spacy>=3.8.5",
+    "transformers>=4.34,<4.38",
     "wheel>=0.45.1",
 ]
