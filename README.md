@@ -18,7 +18,7 @@
 * 정원균
 * 정혜성 : hyeseong
 * 유예솔 : yesol
-* 조현진
+* 조현진: hyunjin
 
 ## Reference
 
