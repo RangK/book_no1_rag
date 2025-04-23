@@ -4,13 +4,18 @@ import os
 import time
 import chromadb
 import spacy
+import textwrap
 import numpy as np
 from rangk.chapter_08.llm_tools import *
 
+
 huggingface_access_key = ""
+with open("huggingface_key.txt", "r") as f:
+    huggingface_access_key = f.read().strip()
+
 os.environ["HF_TOKEN"] = huggingface_access_key
 
-pipeline = create_pipeline_with_huggingface(huggingface_access_key)
+pipeline, tokenizer = create_pipeline_with_huggingface(huggingface_access_key)
 dataset = load_dataset()
 ## filters only data where the support and correct_answer key values are not null
 filtered_dataset = dataset.filter(lambda x: x["support"] is not None and x["correct_answer"] is not None)
@@ -104,17 +109,18 @@ result = collection.get(include=['embeddings'])
 
 # 23:08:59  
 
-query_number = nb
-query_texts = df["question"][:query_number].astype(str).tolist()
-results = collection.query(query_texts=query_texts, n_results=1)
-print("#### Query Results ####")
-for result in results:
-    print(result)
+#### EVALUATION ####
+# query_number = nb
+# query_texts = df["question"][:query_number].astype(str).tolist()
+# results = collection.query(query_texts=query_texts, n_results=1)
+# print("#### Query Results ####")
+# for result in results:
+#     print(result)
 
 
-# 이 코드를 실행 하기 전에 en_core_web_sm를 설치해주세요.
-# !python -m spacy download en_core_web_sm
-nlp = spacy.load("en_core_web_sm")  
+# # 이 코드를 실행 하기 전에 en_core_web_sm를 설치해주세요.
+# # !python -m spacy download en_core_web_sm
+# nlp = spacy.load("en_core_web_sm")  
 
 def simple_text_similarity(text1, text2):
     doc1 = nlp(text1)
@@ -126,26 +132,62 @@ def simple_text_similarity(text1, text2):
     # cosine similarity
     return (np.dot(doc1.vector, doc2.vector) / (np.linalg.norm(doc1.vector) * np.linalg.norm(doc2.vector)))
 
+# nbpd = 100
+# acc_counter = 0
+# display_counter = 0
 
-nbpd = 100
-acc_counter = 0
-display_counter = 0
+# for i, q in enumerate(df['question'][:nb]):
+#     original_completion = df['completion'][i]
+#     retrieved_document = results['documents'][i][0]
+#     similarity_score = simple_text_similarity(original_completion, retrieved_document)
+#     if similarity_score > 0.7:
+#         acc_counter += 1
+#     display_counter += 1
+#     if display_counter <= nbpd or display_counter >= nb - nbpd:
+#         print(i, " ", f"Question: {q}")
+#         print(f"Retrieved document: {retrieved_document}")
+#         print(f"Original completion: {original_completion}")
+#         print(f"Similarity Score: {similarity_score:.2f}")
+#         print()  # Blank line for better readability between entries
 
-for i, q in enumerate(df['question'][:nb]):
-    original_completion = df['completion'][i]
-    retrieved_document = results['documents'][i][0]
-    similarity_score = simple_text_similarity(original_completion, retrieved_document)
-    if similarity_score > 0.7:
-        acc_counter += 1
-    display_counter += 1
-    if display_counter <= nbpd or display_counter >= nb - nbpd:
-        print(i, " ", f"Question: {q}")
-        print(f"Retrieved document: {retrieved_document}")
-        print(f"Original completion: {original_completion}")
-        print(f"Similarity Score: {similarity_score:.2f}")
-        print()  # Blank line for better readability between entries
+# if nb > 0:
+#     acc = acc_counter / nb
+#     print(f"Number of documents: {nb:.2f}")
+#     print(f"Overall similarity score: {acc:.2f}")
+######################
 
-if nb > 0:
-    acc = acc_counter / nb
-    print(f"Number of documents: {nb:.2f}")
-    print(f"Overall similarity score: {acc:.2f}")
+print('\n\n')
+
+s_time = time.time()
+prompt = "Millions of years ago, plants used energy from the sun to form what?"
+results = collection.query(query_texts=[prompt], n_results=1)
+e_time = time.time()
+print(f"Query time: {e_time - s_time:.4f} seconds")
+
+if results['documents'] and len(results['documents'][0]) > 0:
+    wrapped_questions = textwrap.fill(prompt, width=100)
+    wrapped_document = textwrap.fill(results['documents'][0][0], width=100)
+    
+    print("#### RETRIEVED DOCUMENT ####")
+    print(wrapped_questions)
+    print("-------------------------")
+    print(wrapped_document)
+    print("#################")
+else:
+    print("No documents retrieved")
+    
+iprompt = "read the following input and write a summary for beginners"
+lprompt = iprompt + "  " + results['documents'][0][0]
+print("\n")
+print("#### PROMPT ####")
+print(lprompt)
+print("#################")
+
+response = queryLLaMA2(lprompt, pipeline, tokenizer)
+
+for sequence in response:
+    generated_part = sequence["generated_text"].replace(iprompt, "")
+    print(f"LLaMA 응답 : {generated_part}")
+    with open("llama_response.txt", "w") as f:
+        f.write(generated_part)
+        
