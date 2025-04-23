@@ -1,46 +1,20 @@
-## use key for personal access
-huggingface_access_key = ""
-from transformers import AutoTokenizer
-import transformers
-import torch
 from datasets import load_dataset
 import pandas as pd
 import os 
 import time
 import chromadb
+import spacy
+import numpy as np
+from rangk.chapter_08.llm_tools import *
 
+huggingface_access_key = ""
 os.environ["HF_TOKEN"] = huggingface_access_key
 
-# Use HF_TOKEN to load model
-model_name = "meta-llama/Llama-2-7b-chat-hf"
-tokenizer = AutoTokenizer.from_pretrained(model_name, token=huggingface_access_key)
-
-# LLM 에 Query를 날리고 Text를 만들어주는 Pipeline 구성 
-# Query -> Tokenization -> Transformer Inference -> Text
-pipeline = transformers.pipeline(
-    "text-generation",
-    model=model_name,
-    torch_dtype=torch.float16,
-    device_map="auto",
-)
-
-dataset = load_dataset("sciq", split="train")
-
+pipeline = create_pipeline_with_huggingface(huggingface_access_key)
+dataset = load_dataset()
 ## filters only data where the support and correct_answer key values are not null
 filtered_dataset = dataset.filter(lambda x: x["support"] is not None and x["correct_answer"] is not None)
-colmns_to_drop = ["distractor3", "distractor2", "distractor1"]
-
-df = pd.DataFrame(filtered_dataset)
-df.drop(columns=colmns_to_drop, inplace=True)
-
-# 정답 + 지문 (정답에 대한 설명)
-df["completion"] = df["correct_answer"] + " because " + df["support"]
-
-df.dropna(subset=["completion"], inplace=True)
-
-print(df)
-print(df.shape)
-print(df.columns)
+df = create_dataframe(filtered_dataset)
 
 ### 8.5 크로마 컬렉션에 데이터 임베딩 및 업서트
 ## chromadb에서 사용하는 embedding model의 기본 값은 아래와 같다.
@@ -136,9 +110,7 @@ results = collection.query(query_texts=query_texts, n_results=1)
 print("#### Query Results ####")
 for result in results:
     print(result)
-    
-import spacy
-import numpy as np
+
 
 # 이 코드를 실행 하기 전에 en_core_web_sm를 설치해주세요.
 # !python -m spacy download en_core_web_sm
